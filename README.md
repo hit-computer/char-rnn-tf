@@ -1,2 +1,2 @@
 # char-rnn-tf
-Implement character-level language models for Chinese composition generation based-on LSTM, in Python/TensorFlow
+本程序是做中文上的文本生成（具体生成文本的内容和形式取决于训练语料）。模型基本思想和karpathy的[char-rnn](https://github.com/karpathy/char-rnn)程序一致，利用循环神经网络(RNN)在大规模语料上训练一个language model，然后利用训练好的language model去自动生成一段文本。相比于theano版本的[char-rnn](https://github.com/hit-computer/char-rnn)，这个模型采用了多层RNN而不是单层，tensorflow中实现一个多层RNN简直太方便了，同时还加入beam-sample的生成策略。本程序代码参考了tensorflow官方给出的一个language model程序[ptb_word_lm](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/models/rnn/ptb/ptb_word_lm.py)。

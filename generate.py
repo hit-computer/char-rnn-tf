@@ -2,7 +2,8 @@
 import tensorflow as tf
 import sys,time
 import numpy as np
-import cPickle
+import cPickle, os
+import random
 
 config_tf = tf.ConfigProto()
 config_tf.gpu_options.allow_growth = True
@@ -10,19 +11,14 @@ config_tf.inter_op_parallelism_threads = 1
 config_tf.intra_op_parallelism_threads = 1
 
 
-file = sys.argv[1]
-data = open(file,'r').read()
-data = data.decode('utf-8')
-chars = list(set(data)) #char vocabulary
+is_sample = True #true means using sample, if not using max
+is_beams = True #whether or not using beam search
+beam_size = 2 #size of beam search
+model_path = './Argu_Model' #the path of model that need to save or load
+start_word = u'诚' #the first Chinese character of generated text
+len_of_generation = 100 #The number of characters by generated
 
-data_size, _vocab_size = len(data), len(chars)
-print 'data has %d characters, %d unique.' % (data_size, _vocab_size)
-char_to_idx = { ch:i for i,ch in enumerate(chars) }
-idx_to_char = { i:ch for i,ch in enumerate(chars) }
-
-model_path = 'Argu_Model' #the path of model that need to save or load
-
-cPickle.dump((char_to_idx, idx_to_char), open(model_path+'.voc','w'), protocol=cPickle.HIGHEST_PROTOCOL)
+char_to_idx, idx_to_char = cPickle.load(open(model_path+'.voc', 'r'))
 
 class Config(object):
     def __init__(self):
@@ -36,31 +32,7 @@ class Config(object):
         self.save_freq = 5 #The step (counted by the number of iterations) at which the model is saved to hard disk.
         self.keep_prob = 0.5
         self.batch_size = 32
-        self.vocab_size = _vocab_size
-
-def get_config():
-    return Config()
-
-context_of_idx = [char_to_idx[ch] for ch in data]
-
-def ptb_iterator(raw_data, batch_size, num_steps):
-    raw_data = np.array(raw_data, dtype=np.int32)
-
-    data_len = len(raw_data)
-    batch_len = data_len // batch_size
-    data = np.zeros([batch_size, batch_len], dtype=np.int32)
-    for i in range(batch_size):
-        data[i] = raw_data[batch_len * i:batch_len * (i + 1)]#data的shape是(batch_size, batch_len)，每一行是连贯的一段，一次可输入多个段
-
-    epoch_size = (batch_len - 1) // num_steps
-
-    if epoch_size == 0:
-        raise ValueError("epoch_size == 0, decrease batch_size or num_steps")
-
-    for i in range(epoch_size):
-        x = data[:, i*num_steps:(i+1)*num_steps]
-        y = data[:, i*num_steps+1:(i+1)*num_steps+1]#y就是x的错一位，即下一个词
-        yield (x, y)
+        self.vocab_size = 0
         
 class Model(object):
     def __init__(self, is_training, config):
@@ -192,31 +164,81 @@ def run_epoch(session, m, data, eval_op, state=None, is_generation=False):
         return prob, _state
     
 def main(_):
-    train_data = context_of_idx
-
-    config = get_config()
-    
     with tf.Graph().as_default(), tf.Session(config=config_tf) as session:
-        cPickle.dump(config, open(model_path+'.fig','w'), protocol=cPickle.HIGHEST_PROTOCOL)
+        config = cPickle.load(open(model_path+'.fig', 'r'))
+        config.batch_size = 1
+        config.num_steps = 1
         
+        start_idx = char_to_idx[start_word]
+
         initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
         with tf.variable_scope("model", reuse=None, initializer=initializer):
-            m = Model(is_training=True, config=config)
+            mtest = Model(is_training=False, config=config)
 
-        tf.global_variables_initializer().run()
+        #tf.global_variables_initializer().run()
         
-        model_saver = tf.train.Saver(tf.global_variables())
-
-        for i in range(config.iteration):
-            print("Training Epoch: %d ..." % (i+1))
-            train_perplexity = run_epoch(session, m, train_data, m.train_op)
-            print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
+        model_saver = tf.train.Saver()
+        print 'model loading ...'
+        model_saver.restore(session, model_path+'-10')
+        print 'Done!'
+        
+        if not is_beams:
+            _state = mtest.initial_state.eval()
+            test_data = np.int32([start_idx])
+            prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state, True)
+            gen_res = [start_word]
+            if is_sample:
+                gen = np.random.choice(config.vocab_size, 1, p=prob.reshape(-1))
+                gen = gen[0]
+            else:
+                gen = np.argmax(prob.reshape(-1))
+            test_data = np.int32(gen)
+            gen_res.append(idx_to_char[gen])
+            for i in range(len_of_generation-1):
+                prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state, True)
+                if is_sample:
+                    gen = np.random.choice(config.vocab_size, 1, p=prob.reshape(-1))
+                    gen = gen[0]
+                else:
+                    gen = np.argmax(prob.reshape(-1))
+                test_data = np.int32(gen)
+                gen_res.append(idx_to_char[gen])
+            print 'Generated Result: ',''.join(gen_res)
+        else:
+            _state = mtest.initial_state.eval()
+            beams = [(0.0, [idx_to_char[start_idx]], idx_to_char[start_idx])]
+            test_data = np.int32([start_idx])
+            prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state, True)
+            y1 = np.log(1e-20 + prob.reshape(-1))
+            if is_sample:
+                top_indices = np.random.choice(config.vocab_size, beam_size, replace=False, p=prob.reshape(-1))
+            else:
+                top_indices = np.argsort(-y1)
+            b = beams[0]
+            beam_candidates = []
+            for i in xrange(beam_size):
+                wordix = top_indices[i]
+                beam_candidates.append((b[0] + y1[wordix], b[1] + [idx_to_char[wordix]], wordix, _state))
+            beam_candidates.sort(key = lambda x:x[0], reverse = True) # decreasing order
+            beams = beam_candidates[:beam_size] # truncate to get new beams
+            for xy in range(len_of_generation-1):
+                beam_candidates = []
+                for b in beams:
+                    test_data = np.int32(b[2])
+                    prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), b[3], True)
+                    y1 = np.log(1e-20 + prob.reshape(-1))
+                    if is_sample:
+                        top_indices = np.random.choice(config.vocab_size, beam_size, replace=False, p=prob.reshape(-1))
+                    else:
+                        top_indices = np.argsort(-y1)
+                    for i in xrange(beam_size):
+                        wordix = top_indices[i]
+                        beam_candidates.append((b[0] + y1[wordix], b[1] + [idx_to_char[wordix]], wordix, _state))
+                beam_candidates.sort(key = lambda x:x[0], reverse = True) # decreasing order
+                beams = beam_candidates[:beam_size] # truncate to get new beams
             
-            if (i+1) % config.save_freq == 0:
-                print 'model saving ...'
-                model_saver.save(session, model_path+'-%d'%(i+1))
-                print 'Done!'
+            print 'Generated Result: ',''.join(beams[0][1])
             
 if __name__ == "__main__":
     tf.app.run()

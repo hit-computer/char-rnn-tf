@@ -26,3 +26,18 @@ train.py文件中模型参数说明：
 - save_freq：每迭代多少次保存一次模型，同时进行一次生成
 - keep_prob：dropout的概率
 - batch_size：min-batch的大小
+
+####模型测试过程（文本生成过程）
+在进行文本生成时，有两种策略：max和sample策略。本程序同时支持这两种策略，以及beam-search解码。
+
+在命令行中输入：
+
+    python generate.py
+    
+generate.py文件中模型参数说明：
+- model_path：模型保存路径
+- is_sample：是否采用sample策略，设置为False是采用max策略
+- is_beams：是否采用beam-search进行解码，设置为False时不采用（相当于beam_size=1）
+- beam_size：beam-search的窗口大小
+- start_word：期望生成文本的开始符（第一个字）
+- len_of_generation：期望生成文本的长度（包括多少个字）

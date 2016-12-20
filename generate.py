@@ -10,11 +10,11 @@ config_tf.gpu_options.allow_growth = True
 config_tf.inter_op_parallelism_threads = 1
 config_tf.intra_op_parallelism_threads = 1
 
-
+model_path = './Argu_Model' #the path of model that need to save or load
+save_time = 40 #load save_time saved models
 is_sample = True #true means using sample, if not using max
 is_beams = True #whether or not using beam search
 beam_size = 2 #size of beam search
-model_path = './Argu_Model' #the path of model that need to save or load
 start_word = u'诚' #the first Chinese character of generated text
 len_of_generation = 100 #The number of characters by generated
 
@@ -180,7 +180,7 @@ def main(_):
         
         model_saver = tf.train.Saver()
         print 'model loading ...'
-        model_saver.restore(session, model_path+'-10')
+        model_saver.restore(session, model_path+'-%d'%save_time)
         print 'Done!'
         
         if not is_beams:

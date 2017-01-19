@@ -20,7 +20,7 @@ print 'data has %d characters, %d unique.' % (data_size, _vocab_size)
 char_to_idx = { ch:i for i,ch in enumerate(chars) }
 idx_to_char = { i:ch for i,ch in enumerate(chars) }
 
-model_path = 'Argu_Model' #the path of model that need to save or load
+model_path = 'Model' #the path of model that need to save or load
 
 cPickle.dump((char_to_idx, idx_to_char), open(model_path+'.voc','w'), protocol=cPickle.HIGHEST_PROTOCOL)
 
@@ -43,7 +43,7 @@ def get_config():
 
 context_of_idx = [char_to_idx[ch] for ch in data]
 
-def ptb_iterator(raw_data, batch_size, num_steps):
+def data_iterator(raw_data, batch_size, num_steps):
     raw_data = np.array(raw_data, dtype=np.int32)
 
     data_len = len(raw_data)
@@ -157,7 +157,7 @@ def run_epoch(session, m, data, eval_op, state=None, is_generation=False):
         costs = 0.0
         iters = 0
         state = m.initial_state.eval()
-        for step, (x, y) in enumerate(ptb_iterator(data, m.batch_size,
+        for step, (x, y) in enumerate(data_iterator(data, m.batch_size,
                                                         m.num_steps)):
             cost, state, _ = session.run([m.cost, m.final_state, eval_op],#x和y的shape都是(batch_size, num_steps)
                                      {m.input_data: x,

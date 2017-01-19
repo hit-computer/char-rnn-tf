@@ -10,7 +10,7 @@ config_tf.gpu_options.allow_growth = True
 config_tf.inter_op_parallelism_threads = 1
 config_tf.intra_op_parallelism_threads = 1
 
-model_path = './Argu_Model' #the path of model that need to save or load
+model_path = './Model' #the path of model that need to save or load
 save_time = 40 #load save_time saved models
 is_sample = True #true means using sample, if not using max
 is_beams = True #whether or not using beam search
@@ -45,9 +45,6 @@ class Model(object):
         self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
         self._targets = tf.placeholder(tf.int32, [batch_size, num_steps]) #声明输入变量x, y
 
-        # Slightly better results can be obtained with forget gate biases
-        # initialized to 1 but the hyperparameters of the model would need to be
-        # different than reported in the paper.
         lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=0.0, state_is_tuple=False)
         if is_training and config.keep_prob < 1:
             lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
@@ -63,16 +60,7 @@ class Model(object):
         if is_training and config.keep_prob < 1:
             inputs = tf.nn.dropout(inputs, config.keep_prob)
 
-        # Simplified version of tensorflow.models.rnn.rnn.py's rnn().
-        # This builds an unrolled LSTM for tutorial purposes only.
-        # In general, use the rnn() or state_saving_rnn() from rnn.py.
-        #
-        # The alternative version of the code below is:
-        #
-        # from tensorflow.models.rnn import rnn
-        # inputs = [tf.squeeze(input_, [1])
-        #           for input_ in tf.split(1, num_steps, inputs)]
-        # outputs, state = rnn.rnn(cell, inputs, initial_state=self._initial_state)
+        
         outputs = []
         state = self._initial_state
         with tf.variable_scope("RNN"):
@@ -132,36 +120,13 @@ class Model(object):
         return self._train_op
         
         
-def run_epoch(session, m, data, eval_op, state=None, is_generation=False):
+def run_epoch(session, m, data, eval_op, state=None):
     """Runs the model on the given data."""
-    if not is_generation:
-        epoch_size = ((len(data) // m.batch_size) - 1) // m.num_steps
-        start_time = time.time()
-        costs = 0.0
-        iters = 0
-        state = m.initial_state.eval()
-        for step, (x, y) in enumerate(ptb_iterator(data, m.batch_size,
-                                                        m.num_steps)):
-            cost, state, _ = session.run([m.cost, m.final_state, eval_op],#x和y的shape都是(batch_size, num_steps)
-                                     {m.input_data: x,
-                                      m.targets: y,
-                                      m.initial_state: state})
-            costs += cost
-            iters += m.num_steps
-
-            if step and step % (epoch_size // 10) == 0:
-                print("%.2f perplexity: %.3f cost-time: %.2f s" %
-                    (step * 1.0 / epoch_size, np.exp(costs / iters),
-                     (time.time() - start_time)))
-                start_time = time.time()
-            
-        return np.exp(costs / iters)
-    else:
-        x = data.reshape((1,1))
-        prob, _state, _ = session.run([m._prob, m.final_state, eval_op],
-                             {m.input_data: x,
-                              m.initial_state: state})
-        return prob, _state
+    x = data.reshape((1,1))
+    prob, _state, _ = session.run([m._prob, m.final_state, eval_op],
+                         {m.input_data: x,
+                          m.initial_state: state})
+    return prob, _state
     
 def main(_):
     with tf.Graph().as_default(), tf.Session(config=config_tf) as session:
@@ -186,7 +151,7 @@ def main(_):
         if not is_beams:
             _state = mtest.initial_state.eval()
             test_data = np.int32([start_idx])
-            prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state, True)
+            prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state)
             gen_res = [start_word]
             if is_sample:
                 gen = np.random.choice(config.vocab_size, 1, p=prob.reshape(-1))
@@ -196,7 +161,7 @@ def main(_):
             test_data = np.int32(gen)
             gen_res.append(idx_to_char[gen])
             for i in range(len_of_generation-1):
-                prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state, True)
+                prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state)
                 if is_sample:
                     gen = np.random.choice(config.vocab_size, 1, p=prob.reshape(-1))
                     gen = gen[0]
@@ -209,7 +174,7 @@ def main(_):
             _state = mtest.initial_state.eval()
             beams = [(0.0, [idx_to_char[start_idx]], idx_to_char[start_idx])]
             test_data = np.int32([start_idx])
-            prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state, True)
+            prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state)
             y1 = np.log(1e-20 + prob.reshape(-1))
             if is_sample:
                 top_indices = np.random.choice(config.vocab_size, beam_size, replace=False, p=prob.reshape(-1))
@@ -226,7 +191,7 @@ def main(_):
                 beam_candidates = []
                 for b in beams:
                     test_data = np.int32(b[2])
-                    prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), b[3], True)
+                    prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), b[3])
                     y1 = np.log(1e-20 + prob.reshape(-1))
                     if is_sample:
                         top_indices = np.random.choice(config.vocab_size, beam_size, replace=False, p=prob.reshape(-1))

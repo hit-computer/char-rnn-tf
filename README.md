@@ -1,5 +1,5 @@
 # char-rnn-tf
-本程序用于自动生成一段中文文本（具体生成文本的内容和形式取决于训练语料）。模型基本思想和karpathy的[char-rnn](https://github.com/karpathy/char-rnn)程序一致，利用循环神经网络(RNN)在大规模语料上训练一个language model，然后利用训练好的language model去自动生成一段文本。相比于theano版本的[char-rnn](https://github.com/hit-computer/char-rnn)模型，本模型采用了多层RNN而不是单层（tensorflow中实现一个多层RNN简直太方便了），同时还支持max、sample和beam-search多种生成策略。本程序代码参考了tensorflow官方给出的一个language model程序[ptb_word_lm.py](https://github.com/tensorflow/models/blob/master/tutorials/rnn/ptb/ptb_word_lm.py)。
+本程序用于自动生成一段中文文本（训练语料是英文时也可用于生成英文文本），具体生成文本的内容和形式取决于训练语料。模型基本思想和karpathy的[char-rnn](https://github.com/karpathy/char-rnn)程序一致，利用循环神经网络(RNN)在大规模语料上训练一个language model，然后利用训练好的language model去自动生成一段文本。相比于theano版本的[char-rnn](https://github.com/hit-computer/char-rnn)模型，本模型采用了多层RNN而不是单层（tensorflow中实现一个多层RNN简直太方便了），同时还支持max、sample和beam-search多种生成策略。本程序代码参考了tensorflow官方给出的一个language model程序[ptb_word_lm.py](https://github.com/tensorflow/models/blob/master/tutorials/rnn/ptb/ptb_word_lm.py)。
 
 模型结构如下图所示
 

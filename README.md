@@ -7,7 +7,7 @@
 
 ---------------------------------------------------
 ## 运行说明
-本代码是在TensorFlow 0.12版本下编写的，要在1.0版本下运行需要修改两个地方：把所有的tf.nn.rnn_cell都改成tf.contrib.rnn，还有101行tf.concat(1, outputs)改成tf.concat(outputs, 1)。
+本代码是在Python 2 / TensorFlow 0.12版本下编写的，要在1.0版本下运行需要修改两个地方：把所有的tf.nn.rnn_cell都改成tf.contrib.rnn，还有train.py的101行和generate.py的72行里的tf.concat(1, outputs)改成tf.concat(outputs, 1)。
 #### 模型训练过程
 在命令行中输入：
 

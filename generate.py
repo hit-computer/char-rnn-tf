@@ -159,8 +159,7 @@ def main(_):
                 try:
                     char_index = char_to_idx[char]
                 except KeyError:
-                    top_indices = np.argsort(-y1)
-                    char_index = top_indices[0]
+                    char_index = np.argmax(prob.reshape(-1))
                 prob, _state = run_epoch(session, mtest, np.int32([char_index]), tf.no_op(), _state)
                 gen_res.append(char)
             # gen text

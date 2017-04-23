@@ -15,8 +15,8 @@ save_time = 40 #load save_time saved models
 is_sample = True #true means using sample, if not using max
 is_beams = True #whether or not using beam search
 beam_size = 2 #size of beam search
-len_of_generation = 100 #The number of characters by generated
-start_sentence = u'挽著我的手' #the seed sentence to generate text
+len_of_generation = 200 #The number of characters by generated
+start_sentence = u'那是因为我看到了另一个自己的悲伤' #the seed sentence to generate text
 
 char_to_idx, idx_to_char = cPickle.load(open(model_path+'.voc', 'r'))
 
@@ -45,11 +45,11 @@ class Model(object):
         self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
         self._targets = tf.placeholder(tf.int32, [batch_size, num_steps]) #声明输入变量x, y
 
-        lstm_cell = tf.contrib.rnn.BasicLSTMCell(size, forget_bias=0.0, state_is_tuple=False)
+        lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=0.0, state_is_tuple=False)
         if is_training and config.keep_prob < 1:
-            lstm_cell = tf.contrib.rnn.DropoutWrapper(
+            lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
                 lstm_cell, output_keep_prob=config.keep_prob)
-        cell = tf.contrib.rnn.MultiRNNCell([lstm_cell] * config.num_layers, state_is_tuple=False)
+        cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * config.num_layers, state_is_tuple=False)
 
         self._initial_state = cell.zero_state(batch_size, tf.float32)
 
@@ -69,15 +69,15 @@ class Model(object):
                 (cell_output, state) = cell(inputs[:, time_step, :], state) #inputs[:, time_step, :]的shape是(batch_size, size)
                 outputs.append(cell_output)
 
-        output = tf.reshape(tf.concat(outputs, 1), [-1, size])
+        output = tf.reshape(tf.concat(1, outputs), [-1, size])
         """
-        outpus是一个list，n*(batch_size, hidden_size)，tf.concat(outputs, 1)返回一个矩阵(batch_size, n*hidden_size)
+        outpus是一个list，n*(batch_size, hidden_size)，tf.concat(1, outputs)返回一个矩阵(batch_size, n*hidden_size)
         reshape(..., [-1, size])
         """
         softmax_w = tf.get_variable("softmax_w", [size, vocab_size])
         softmax_b = tf.get_variable("softmax_b", [vocab_size])
         logits = tf.matmul(output, softmax_w) + softmax_b #logits应该是(batch_size*time_step, vocab_size)，顺序是第一段的第一个词，第二个词，...，然后是第二段的第一个词，...
-        loss = tf.contrib.legacy_seq2seq.sequence_loss_by_example(
+        loss = tf.nn.seq2seq.sequence_loss_by_example(
             [logits],
             [tf.reshape(self._targets, [-1])],
             [tf.ones([batch_size * num_steps])])

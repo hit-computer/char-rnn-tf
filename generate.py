@@ -15,8 +15,8 @@ save_time = 40 #load save_time saved models
 is_sample = True #true means using sample, if not using max
 is_beams = True #whether or not using beam search
 beam_size = 2 #size of beam search
-start_word = u'诚' #the first Chinese character of generated text
-len_of_generation = 100 #The number of characters by generated
+len_of_generation = 200 #The number of characters by generated
+start_sentence = u'那是因为我看到了另一个自己的悲伤' #the seed sentence to generate text
 
 char_to_idx, idx_to_char = cPickle.load(open(model_path+'.voc', 'r'))
 
@@ -33,7 +33,7 @@ class Config(object):
         self.keep_prob = 0.5
         self.batch_size = 32
         self.vocab_size = 0
-        
+
 class Model(object):
     def __init__(self, is_training, config):
         self.batch_size = batch_size = config.batch_size
@@ -60,7 +60,7 @@ class Model(object):
         if is_training and config.keep_prob < 1:
             inputs = tf.nn.dropout(inputs, config.keep_prob)
 
-        
+
         outputs = []
         state = self._initial_state
         with tf.variable_scope("RNN"):
@@ -118,8 +118,8 @@ class Model(object):
     @property
     def train_op(self):
         return self._train_op
-        
-        
+
+
 def run_epoch(session, m, data, eval_op, state=None):
     """Runs the model on the given data."""
     x = data.reshape((1,1))
@@ -127,14 +127,12 @@ def run_epoch(session, m, data, eval_op, state=None):
                          {m.input_data: x,
                           m.initial_state: state})
     return prob, _state
-    
+
 def main(_):
     with tf.Graph().as_default(), tf.Session(config=config_tf) as session:
         config = cPickle.load(open(model_path+'.fig', 'r'))
         config.batch_size = 1
         config.num_steps = 1
-        
-        start_idx = char_to_idx[start_word]
 
         initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
@@ -142,17 +140,30 @@ def main(_):
             mtest = Model(is_training=False, config=config)
 
         #tf.global_variables_initializer().run()
-        
+
         model_saver = tf.train.Saver()
         print 'model loading ...'
         model_saver.restore(session, model_path+'-%d'%save_time)
         print 'Done!'
-        
+
         if not is_beams:
+            # sentence state
+            char_list = list(start_sentence);
+            start_idx = char_to_idx[char_list[0]]
             _state = mtest.initial_state.eval()
             test_data = np.int32([start_idx])
             prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state)
-            gen_res = [start_word]
+            gen_res = [char_list[0]]
+            for i in xrange(1, len(char_list)):
+                char = char_list[i]
+                try:
+                    char_index = char_to_idx[char]
+                except KeyError:
+                    top_indices = np.argsort(-y1)
+                    char_index = top_indices[0]
+                prob, _state = run_epoch(session, mtest, np.int32([char_index]), tf.no_op(), _state)
+                gen_res.append(char)
+            # gen text
             if is_sample:
                 gen = np.random.choice(config.vocab_size, 1, p=prob.reshape(-1))
                 gen = gen[0]
@@ -171,11 +182,26 @@ def main(_):
                 gen_res.append(idx_to_char[gen])
             print 'Generated Result: ',''.join(gen_res)
         else:
+            # sentence state
+            char_list = list(start_sentence);
+            start_idx = char_to_idx[char_list[0]]
             _state = mtest.initial_state.eval()
             beams = [(0.0, [idx_to_char[start_idx]], idx_to_char[start_idx])]
             test_data = np.int32([start_idx])
             prob, _state = run_epoch(session, mtest, test_data, tf.no_op(), _state)
             y1 = np.log(1e-20 + prob.reshape(-1))
+            beams = [(beams[0][0], beams[0][1], beams[0][2], _state)]
+            for i in xrange(1, len(char_list)):
+                char = char_list[i]
+                try:
+                    char_index = char_to_idx[char]
+                except KeyError:
+                    top_indices = np.argsort(-y1)
+                    char_index = top_indices[0]
+                prob, _state = run_epoch(session, mtest, np.int32([char_index]), tf.no_op(), beams[0][3])
+                y1 = np.log(1e-20 + prob.reshape(-1))
+                beams = [(beams[0][0], beams[0][1] + [char], char_index, _state)]
+            # gen text
             if is_sample:
                 top_indices = np.random.choice(config.vocab_size, beam_size, replace=False, p=prob.reshape(-1))
             else:
@@ -202,8 +228,8 @@ def main(_):
                         beam_candidates.append((b[0] + y1[wordix], b[1] + [idx_to_char[wordix]], wordix, _state))
                 beam_candidates.sort(key = lambda x:x[0], reverse = True) # decreasing order
                 beams = beam_candidates[:beam_size] # truncate to get new beams
-            
+
             print 'Generated Result: ',''.join(beams[0][1])
-            
+
 if __name__ == "__main__":
     tf.app.run()

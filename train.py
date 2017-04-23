@@ -99,10 +99,7 @@ class Model(object):
                 outputs.append(cell_output)
 
         output = tf.reshape(tf.concat(1, outputs), [-1, size])
-        """
-        outpus是一个list，n*(batch_size, hidden_size)，tf.concat(1, outputs)返回一个矩阵(batch_size, n*hidden_size)
-        reshape(..., [-1, size])
-        """
+        
         softmax_w = tf.get_variable("softmax_w", [size, vocab_size])
         softmax_b = tf.get_variable("softmax_b", [vocab_size])
         logits = tf.matmul(output, softmax_w) + softmax_b #logits应该是(batch_size*time_step, vocab_size)，顺序是第一段的第一个词，第二个词，...，然后是第二段的第一个词，...

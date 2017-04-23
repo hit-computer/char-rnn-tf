@@ -5,9 +5,9 @@
 
 ![model](model.jpg?raw=true "model")
 
----------------------------------------------------
+
 ## 运行说明
-本代码是在Python 2 / TensorFlow 0.12版本下编写的，要在1.0版本下运行需要修改两个地方：把所有的tf.nn.rnn_cell都改成tf.contrib.rnn，还有train.py的101行和generate.py的72行里的tf.concat(1, outputs)改成tf.concat(outputs, 1)。
+本代码是在Python 2 / TensorFlow 0.12版本下编写的，要在1.0版本下运行需要修改两个地方：把所有的`tf.nn.rnn_cell`都改成`tf.contrib.rnn`，还有`tf.concat(1, outputs)`改成`tf.concat(outputs, 1)`，以及`tf.nn.seq2seq.sequence_loss_by_example`改成`tf.contrib.legacy_seq2seq.sequence_loss_by_example`。
 #### 模型训练过程
 在命令行中输入：
 

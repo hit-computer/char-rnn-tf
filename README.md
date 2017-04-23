@@ -41,7 +41,7 @@ generate.py文件中模型参数说明：
 - is_sample：是否采用sample策略，设置为False是采用max策略
 - is_beams：是否采用beam-search进行解码，设置为False时不采用（相当于beam_size=1）
 - beam_size：beam-search的窗口大小
-- start_sentence：期望生成文本的开始部分（如果仅仅只是一个字，则和karpathy的程序是一致的，一个字作为起始符）
+- start_sentence：期望生成文本的开始部分（可以是一个句子，一个词，也可以仅仅只是一个字）
 - len_of_generation：期望生成文本的长度（包括多少个字）
 
 ## 实验

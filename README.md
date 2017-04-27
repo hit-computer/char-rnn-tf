@@ -12,7 +12,7 @@
 #### 模型参数设置（在Config.py文件中设置）：
 - init_scale：参数使用均匀分布进行初始化，该值为均匀分布的上下界
 - learning_rate：学习率
-- max_grad_norm：对梯度进行规范化，参见tensorflow的clip_by_global_norm函数 
+- max_grad_norm：对梯度进行规范化（gradient clipping） 
 - num_layers：RNN的层级数目
 - num_steps：RNN展开的步骤数（每次训练多少个字符）
 - hidden_size：神经网络隐含层的维度
